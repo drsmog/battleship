@@ -1,0 +1,490 @@
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>battleship</title>
+    <style>
+    body {
+        background: steelblue;
+    }
+    
+    .board {
+        width: 220px;
+        height: 220px;
+    }
+    
+    .box {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: solid white 1px;
+    }
+    
+    .box:hover {
+        background-color: white;
+    }
+    
+    .ship {
+        background-image: url(img/ship-icon.png);
+        background-repeat: no-repeat;
+        background-color: yellow;
+        background-position: 0px -15px;
+        background-size: 21px 50px;
+        border: yellow solid 1px;
+        width: 20px;
+        height: 20px;
+        display: inline-block;
+    }
+    
+    .ship.vertical {
+        background-image: url(img/ship-vertical.png);
+        background-position: -13px 0px;
+    }
+    
+    .ship.size-1.vertical {
+        background-size: 50px 21px;
+        height: 20px;
+        width: 20px;
+    }
+    
+    .ship.size-2 {
+        background-size: 42px 50px;
+        width: 42px;
+    }
+    
+    .ship.size-2.vertical {
+        background-size: 50px 42px;
+        height: 42px;
+        width: 20px;
+    }
+    
+    .ship.size-3 {
+        background-size: 63px 50px;
+        width: 63px;
+    }
+    
+    .ship.size-3.vertical {
+        background-size: 50px 63px;
+        height: 63px;
+        width: 20px;
+    }
+    
+    .ship.size-4 {
+        background-size: 85px 50px;
+        width: 85px;
+    }
+    
+    .ship.size-4.vertical {
+        background-size: 50px 85px;
+        height: 85px;
+        width: 20px;
+    }
+    
+    #enemyBoard {
+        float: left;
+    }
+    
+    [data-boxstatus='0'] {
+        background-color: none;
+    }
+    
+    [data-boxstatus='1'] {
+        background-color: orange;
+    }
+    
+    [data-boxstatus='2'] {
+        background-color: powderblue;
+    }
+    
+    [data-boxstatus='4'] {
+        background-color: red;
+    }
+    
+    #myBoard {
+        float: right;
+        position: relative;
+    }
+    
+    #gameBoard {
+        margin: 200px auto;
+        width: 500px;
+        height: 500px;
+    }
+    </style>
+</head>
+
+<body>
+    <div id="shipsContainer"></div>
+    <div id="gameBoard">
+        <div id="enemyBoard" class="board">
+        </div>
+        <div id="myBoard" class="board" ondrop="drop(event)" ondragover="allowDrop(event)" ondragleave="dragLeave(event)">
+        </div>
+    </div>
+    <script>
+    var enemyBoard = [];
+    var myBoard = [];
+
+    loadGameBoards();
+
+    function loadGameBoards() {
+        createBoard("enemyBoard");
+        createBoard("myBoard");
+        prepareVirtualBoard(enemyBoard);
+        prepareVirtualBoard(myBoard);
+        populateShipsRandomly(enemyBoard);
+        renderMyShips("shipsContainer");
+    }
+
+
+
+
+    function createBoard(containerId) {
+
+        var container = document.getElementById(containerId);
+
+        for (var i = 0; i < 10; i++) {
+            container.appendChild(createRow(i));
+        }
+
+
+        function createRow(y) {
+
+            var row = document.createElement("div");
+
+            for (var i = 0; i < 10; i++) {
+                var spanBox = document.createElement("span");
+                spanBox.className = "box";
+                spanBox.dataset.y = y;
+                spanBox.dataset.x = i;
+                row.appendChild(spanBox);
+            }
+
+            return row;
+        }
+    }
+
+    function prepareVirtualBoard(array) {
+
+        if (!array) array = [];
+
+
+        for (var i = 0; i < 10; i++) {
+            array.push([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+
+        }
+    }
+
+    function populateShipsRandomly(board) {
+
+        [1, 1, 1, 1, 2, 2, 2, 3, 3, 4].map(function(shipSize) {
+            createRandomShip(shipSize);
+        });
+
+        function createRandomShip(shipSize) {
+            var scanned = scanVirtualBoard(board);
+
+            var direction = getRandom(0, 2);
+
+            var array = direction === 1 ? scanned.verticalScan : scanned.horizontalScan;
+
+
+            var availableRows = array.map(function(val, index) {
+                if (val.indexOf(shipSize) === -1) return null;
+                return index;
+            }).filter(function(val) {
+                return val !== null;
+            });
+
+            var randomFilteredRowIndex = getRandom(0, availableRows.length);
+            var randomRowNumber = availableRows[randomFilteredRowIndex];
+            var randowRow = array[randomRowNumber];
+
+            var availableColsInRow = randowRow.map(function(val, index) {
+                if (val < shipSize) return null;
+                return index;
+            }).filter(function(val) {
+                return val !== null;
+            });
+
+            var randomFilteredColIndex = getRandom(0, availableColsInRow.length);
+            var randomColNumber = availableColsInRow[randomFilteredColIndex];
+
+
+            if (direction === 1) {
+                setVerticalShip(board, randomRowNumber, randomColNumber, shipSize, "#enemyBoard");
+            } else {
+                setHorizontalShip(board, randomRowNumber, randomColNumber, shipSize, "#enemyBoard");
+            }
+        }
+    }
+
+    function setHorizontalShip(board, row, col, shipSize, boardSelector) {
+
+        //1 - ship
+        //2 - disabled
+        //3 - exploded 
+
+        for (var i = 0; i < shipSize; i++) {
+            board[row][col + i] = 1;
+            setShipStatus(boardSelector, row, col + i, 1);
+        }
+
+        if (col + shipSize <= 9) {
+            board[row][col + shipSize] = 2;
+            setShipStatus(boardSelector, row, col + shipSize, 2);
+        }
+        if (col - 1 >= 0) {
+            board[row][col - 1] = 2;
+            setShipStatus(boardSelector, row, col - 1, 2);
+        }
+
+        if (row + 1 <= 9) {
+            for (var i = 0; i < shipSize; i++) {
+                board[row + 1][col + i] = 2;
+                setShipStatus(boardSelector, row + 1, col + i, 2);
+            }
+        }
+
+        if (row - 1 >= 0) {
+            for (var i = 0; i < shipSize; i++) {
+                board[row - 1][col + i] = 2;
+                setShipStatus(boardSelector, row - 1, col + i, 2);
+            }
+        }
+
+    }
+
+    function setVerticalShip(board, row, col, shipSize, boardSelector) {
+        //1 - ship
+        //2 - disabled
+        //3 - exploded 
+
+        for (var i = 0; i < shipSize; i++) {
+            board[row + i][col] = 1;
+            setShipStatus(boardSelector, row + i, col, 1);
+        }
+
+        if (row + shipSize <= 9) {
+            board[row + shipSize][col] = 2;
+            setShipStatus(boardSelector, row + shipSize, col, 2);
+        }
+        if (row - 1 >= 0) {
+            board[row - 1][col] = 2;
+            setShipStatus(boardSelector, row - 1, col, 2);
+        }
+
+        if (col + 1 <= 9) {
+            for (var i = 0; i < shipSize; i++) {
+                board[row + i][col + 1] = 2;
+                setShipStatus(boardSelector, row + i, col + 1, 2);
+            }
+        }
+
+        if (col - 1 >= 0) {
+            for (var i = 0; i < shipSize; i++) {
+                board[row + i][col - 1] = 2;
+                setShipStatus(boardSelector, row + i, col - 1, 2);
+            }
+        }
+    }
+
+    function setShipStatus(boardSelector, row, col, status) {
+        var domBoard = document.querySelectorAll(boardSelector + " [data-x='" + col + "'][data-y='" + row + "']");
+        domBoard[0].dataset.boxstatus = status;
+    }
+
+    function scanVirtualBoard(board) {
+
+
+        var horizontalScan = [];
+        var verticalScan = []
+
+        for (var row = 0; row < board.length; row++) {
+
+            var scannedRow = board[row].map(function(val, index, array) {
+                return getAvailabilityNumber(array, index);
+
+            });
+
+            horizontalScan.push(scannedRow);
+
+            var column = getColumnFrom2dArray(board, row);
+
+            var scannedColumn = column.map(function(val, index, array) {
+                return getAvailabilityNumber(array, index);
+            });
+
+            for (var i = 0; i < scannedColumn.length; i++) {
+
+                if (!verticalScan[i]) {
+                    verticalScan.push([]);
+                }
+
+                verticalScan[i].push(scannedColumn[i]);
+
+            }
+
+
+        }
+
+
+
+        return {
+            horizontalScan: horizontalScan,
+            verticalScan: verticalScan
+        }
+
+
+        function getAvailabilityNumber(array, startFrom) {
+
+            var availabilityNumbers = [4, 3, 2, 1].map(function(shipSize) {
+                if (startFrom + shipSize > array.length) return null;
+                return array.slice(startFrom, startFrom + shipSize).reduce(function(a, b) {
+                    return a + b;
+                });
+            });
+
+
+            if (availabilityNumbers[0] === 0) return 4;
+            if (availabilityNumbers[1] === 0) return 3;
+            if (availabilityNumbers[2] === 0) return 2;
+            if (availabilityNumbers[3] === 0) return 1;
+
+            return null;
+        }
+
+        function getColumnFrom2dArray(array, n) {
+            return array.map(function(val) {
+                return val[n];
+            })
+        }
+    }
+
+    function getRandom(min, max) {
+        return Math.floor(Math.random() * (max - min) + min);
+    }
+
+    //----------------------------------------------------------------------------------
+    //----------------------------------- User Side ------------------------------------
+    //----------------------------------------------------------------------------------
+    //----------------------------------------------------------------------------------
+
+    var CurrentShipSize = 0;
+    var IsVerticalShip = false;
+
+    function renderMyShips(containerId) {
+
+        var container = document.getElementById(containerId);
+
+        if (!container) return;
+        
+        [4, 3, 3, 2, 2, 2, 1, 1, 1, 1].forEach(function(shipSize, index) {
+            var shipSpan = document.createElement("SPAN");
+            shipSpan.id = "myship-" + index;
+            shipSpan.className = "ship " + "size-" + shipSize;
+            shipSpan.draggable = true;
+            shipSpan.ondragstart = drag;
+            shipSpan.onclick = myShip_click;
+            shipSpan.dataset.shipsize = shipSize;
+            container.appendChild(shipSpan);
+
+        });
+
+    }
+
+    function allowDrop(ev) {
+
+        ev.preventDefault();
+
+        if(!ev.target.classList.contains("box")) return;
+
+        var shipSize = CurrentShipSize;
+
+        var boardElement = document.getElementById("myBoard");
+
+        clearSelectedBoxes(boardElement);
+
+        for (var i = 0; i < shipSize; i++) {
+            var nextX = Number(ev.target.dataset.x);
+            var nextY = Number(ev.target.dataset.y);
+
+            if(IsVerticalShip)
+                nextY+=i;
+            else
+                nextX+=i;
+
+            if (nextX > 9 || nextY>9) continue;
+
+            var boxElement = boardElement.querySelector("[data-x='" + nextX + "'][data-y='" + nextY + "']")
+            boxElement.dataset.boxstatus = 4;
+        }
+
+    }
+
+
+
+    function dragLeave(ev) {
+        
+        clearSelectedBoxes(ev.path[2]);
+
+    }
+
+    function drag(ev) {
+        CurrentShipSize = ev.target.dataset.shipsize;
+        IsVerticalShip = ev.target.classList.contains("vertical");
+
+        ev.dataTransfer.setData("shipid", ev.target.id);
+        
+        
+    }
+
+    function drop(ev) {
+
+        ev.preventDefault();
+
+        var boardElement = document.getElementById("myBoard");
+
+        var selectedBoxes = boardElement.querySelectorAll("[data-boxstatus='4']");
+
+        var leftOffsets = Array.prototype.slice.call(selectedBoxes, 0).map(function(box) {
+            return Number(box.offsetLeft);
+        });
+
+        var shipX = Math.min.apply(Math, leftOffsets);
+        var shipY = Number(selectedBoxes[0].offsetTop);
+
+        clearSelectedBoxes(boardElement);
+
+        var shipId = ev.dataTransfer.getData("shipid");
+        var ship = document.getElementById(shipId);
+
+        boardElement.appendChild(ship);
+
+        ship.style.position = "absolute";
+        ship.style.left = shipX + 'px';
+        ship.style.top = shipY + 'px';
+
+        ship.dataset.x = ev.target.dataset.x;
+        ship.dataset.y = ev.target.dataset.y;
+
+    }
+
+    function clearSelectedBoxes(boardElement) {
+
+        var selectedBoxes = boardElement.querySelectorAll("[data-boxstatus='4']");
+        selectedBoxes.forEach(function(box) {
+            box.dataset.boxstatus = 0;
+        });
+    }
+
+    function myShip_click(ev) {
+
+        ev.target.classList.toggle("vertical")
+
+
+    }
+    </script>
+</body>
+
+</html>
