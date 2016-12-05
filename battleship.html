@@ -110,6 +110,9 @@
         width: 500px;
         height: 500px;
     }
+    #shipsContainer{
+        height: 90px;
+    }
     </style>
 </head>
 
@@ -372,13 +375,17 @@
 
     var CurrentShipSize = 0;
     var IsVerticalShip = false;
+    var CurrentShipPosition = {
+        x: null,
+        y: null
+    };
 
     function renderMyShips(containerId) {
 
         var container = document.getElementById(containerId);
 
         if (!container) return;
-        
+
         [4, 3, 3, 2, 2, 2, 1, 1, 1, 1].forEach(function(shipSize, index) {
             var shipSpan = document.createElement("SPAN");
             shipSpan.id = "myship-" + index;
@@ -397,7 +404,7 @@
 
         ev.preventDefault();
 
-        if(!ev.target.classList.contains("box")) return;
+        if (!ev.target.classList.contains("box")) return;
 
         var shipSize = CurrentShipSize;
 
@@ -409,12 +416,12 @@
             var nextX = Number(ev.target.dataset.x);
             var nextY = Number(ev.target.dataset.y);
 
-            if(IsVerticalShip)
-                nextY+=i;
+            if (IsVerticalShip)
+                nextY += i;
             else
-                nextX+=i;
+                nextX += i;
 
-            if (nextX > 9 || nextY>9) continue;
+            if (nextX > 9 || nextY > 9) continue;
 
             var boxElement = boardElement.querySelector("[data-x='" + nextX + "'][data-y='" + nextY + "']")
             boxElement.dataset.boxstatus = 4;
@@ -425,18 +432,22 @@
 
 
     function dragLeave(ev) {
-        
+
         clearSelectedBoxes(ev.path[2]);
 
     }
 
     function drag(ev) {
+
         CurrentShipSize = ev.target.dataset.shipsize;
         IsVerticalShip = ev.target.classList.contains("vertical");
+        CurrentShipPosition.x = ev.target.dataset.x;
+        CurrentShipPosition.y = ev.target.dataset.y;
+
 
         ev.dataTransfer.setData("shipid", ev.target.id);
-        
-        
+
+
     }
 
     function drop(ev) {
@@ -444,6 +455,22 @@
         ev.preventDefault();
 
         var boardElement = document.getElementById("myBoard");
+
+        var startPosition = {
+            y: Number(ev.target.dataset.y),
+            x: Number(ev.target.dataset.x)
+        };
+
+        var endPosition = {
+            y: IsVerticalShip ? Number(ev.target.dataset.y) + Number(CurrentShipSize) : Number(ev.target.dataset.y),
+            x: IsVerticalShip ? Number(ev.target.dataset.x) : Number(ev.target.dataset.x) + Number(CurrentShipSize)
+        };
+
+        if (!setMyShipOnBoard(startPosition, endPosition, CurrentShipPosition, IsVerticalShip, CurrentShipSize)) {
+            clearSelectedBoxes(boardElement);
+            return;
+        }
+
 
         var selectedBoxes = boardElement.querySelectorAll("[data-boxstatus='4']");
 
@@ -479,10 +506,118 @@
     }
 
     function myShip_click(ev) {
-
         ev.target.classList.toggle("vertical")
+        CurrentShipSize = ev.target.dataset.shipsize;
+        IsVerticalShip = ev.target.classList.contains("vertical");
+
+        CurrentShipPosition.x = ev.target.dataset.x;
+        CurrentShipPosition.y = ev.target.dataset.y;
+
+        if (!CurrentShipPosition.x && !CurrentShipPosition.y)
+            return;
+
+        var startPosition = {
+            y: Number(CurrentShipPosition.y),
+            x: Number(CurrentShipPosition.x)
+        };
+
+        var endPosition = {
+            y: IsVerticalShip ? Number(CurrentShipPosition.y) + Number(CurrentShipSize) : Number(CurrentShipPosition.y),
+            x: IsVerticalShip ? Number(CurrentShipPosition.x) : Number(CurrentShipPosition.x) + Number(CurrentShipSize)
+        };
+
+        if (!setMyShipOnBoard(startPosition, endPosition, startPosition, !IsVerticalShip, CurrentShipSize)) {
+            IsVerticalShip = !IsVerticalShip;
+            ev.target.classList.toggle("vertical");
+
+        }
+
+    }
+
+    function setMyShipOnBoard(startPosition, endPosition, shipOldPosition, wasVertical, shipSize) {
+
+        if (shipOldPosition.x && shipOldPosition.y)
+            clearOldPosition(shipOldPosition, wasVertical, shipSize);
+
+        var xDelta = endPosition.x - startPosition.x;
+        var yDelta = endPosition.y - startPosition.y;
+
+        var shipSize = Math.max(xDelta, yDelta);
+        var isHorizontal = xDelta !== 0;
 
 
+        for (var i = 0; i < shipSize; i++) {
+            var box_y = startPosition.y;
+            var box_x = startPosition.x;
+
+            if (isHorizontal)
+                box_x += i;
+            else
+                box_y += i;
+
+            if (box_y > 9 || box_y < 0 || box_x > 9 || box_x < 0) return false;
+            if (myBoard[box_y][box_x] !== 0) return false;
+
+        }
+
+        for (var i = 0; i < shipSize; i++) {
+            var box_y = startPosition.y;
+            var box_x = startPosition.x;
+            if (isHorizontal)
+                box_x += i;
+            else
+                box_y += i;
+            myBoard[box_y][box_x] = 1;
+
+            //disable around boxes
+            disableBox(box_y + 1, box_x);
+            disableBox(box_y - 1, box_x);
+            disableBox(box_y, box_x + 1);
+            disableBox(box_y, box_x - 1);
+
+        }
+
+
+        function disableBox(y, x) {
+
+            if (y > 9 || x > 9 || y < 0 || x < 0) return;
+
+            if (myBoard[y][x] !== 0) return;
+
+            myBoard[y][x] = 2;
+        }
+
+        function clearOldPosition(oldPosition, isVertical, shipSize) {
+
+            for (var i = 0; i < Number(shipSize); i++) {
+
+                var box_x = Number(oldPosition.x);
+                var box_y = Number(oldPosition.y);
+
+                if (!isVertical)
+                    box_x += i;
+                else
+                    box_y += i;
+
+                myBoard[box_y][box_x] = 0;
+
+                emptyBox(box_y + 1, box_x);
+                emptyBox(box_y - 1, box_x);
+                emptyBox(box_y, box_x + 1);
+                emptyBox(box_y, box_x - 1);
+
+            }
+
+            function emptyBox(y, x) {
+                if (y > 9 || x > 9 || y < 0 || x < 0) return;
+                myBoard[y][x] = 0;
+
+            }
+        }
+
+        console.table(myBoard);
+
+        return true;
     }
     </script>
 </body>
