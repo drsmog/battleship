@@ -80,10 +80,6 @@
         width: 20px;
     }
     
-    #enemyBoard {
-        float: left;
-    }
-    
     [data-boxstatus='0'] {
         background-color: none;
     }
@@ -100,6 +96,10 @@
         background-color: red;
     }
     
+    #enemyBoard {
+        float: left;
+    }
+    
     #myBoard {
         float: right;
         position: relative;
@@ -110,14 +110,22 @@
         width: 500px;
         height: 500px;
     }
-    #shipsContainer{
+    
+    #shipsContainer {
         height: 90px;
+    }
+    #headerContainer{
+        margin: 0 auto;
+        width: 500px;
     }
     </style>
 </head>
 
 <body>
-    <div id="shipsContainer"></div>
+    <div id="headerContainer">
+        <div id="shipsContainer"></div>
+        <!-- <button onclick="startGame()">start game</button> -->
+    </div>
     <div id="gameBoard">
         <div id="enemyBoard" class="board">
         </div>
@@ -129,6 +137,7 @@
     var myBoard = [];
 
     loadGameBoards();
+    
 
     function loadGameBoards() {
         createBoard("enemyBoard");
@@ -536,7 +545,7 @@
 
     function setMyShipOnBoard(startPosition, endPosition, shipOldPosition, wasVertical, shipSize) {
 
-        if (shipOldPosition.x && shipOldPosition.y)
+        if (shipOldPosition.x!=undefined || shipOldPosition.y!=undefined)
             clearOldPosition(shipOldPosition, wasVertical, shipSize);
 
         var xDelta = endPosition.x - startPosition.x;
@@ -619,6 +628,7 @@
 
         return true;
     }
+
     </script>
 </body>
 
